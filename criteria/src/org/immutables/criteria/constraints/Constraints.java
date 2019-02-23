@@ -31,96 +31,36 @@ public final class Constraints {
   private Constraints() {}
 
   /**
-   * This "host" could accepts {@link ConstraintVisitor}s. Allows evaluation of criterias.
+   * This "host" could accepts {@link Visitor}s. Allows evaluation of criterias.
    */
-  public interface ConstraintHost {
-    <V extends ConstraintVisitor<V>> V accept(V visitor);
+  public interface Visitable {
+    <R> R accept(Visitor<R> visitor);
   }
 
-  public interface ConstraintVisitor<V extends ConstraintVisitor<V>> {
-    V in(String name, boolean negate, Iterable<?> values);
+  public interface Visitor<V> {
 
-    V equal(String name, boolean negate, @Nullable Object value);
-
-    V range(String name, boolean negate, Range<?> range);
-
-    V size(String name, boolean negate, int size);
-
-    V present(String name, boolean negate);
-
-    V match(String name, boolean negate, Pattern pattern);
-
-    V nested(String name, ConstraintHost constraints);
+    V visit(String name, Operation<?> operation);
 
     V disjunction();
   }
 
-
-  private static final class InConstraint extends ConsConstraint {
-    InConstraint(Constraint tail, String name, boolean negate, Iterable<?> value) {
-      super(tail, name, negate, ImmutableSet.copyOf(value));
-    }
-
-    @Override
-    <V extends ConstraintVisitor<V>> V dispatch(V visitor) {
-      return visitor.in(name, negate, (Iterable<?>) value);
-    }
+  public static Constraint isEqualTo(Constraint tail, String name, @Nullable Object value) {
+    return new ConsConstraint(tail, name, )
   }
 
-  private static final class EqualToConstraint extends ConsConstraint {
-    EqualToConstraint(Constraint tail, String name, boolean negate, Object value) {
-      super(tail, name, negate, value);
-    }
-
-    @Override
-    <V extends ConstraintVisitor<V>> V dispatch(V visitor) {
-      return visitor.equal(name, negate, value);
-    }
+  public static Constraint isNotEqualTo(Constraint tail, String name, @Nullable Object value) {
+    return new EqualToConstraint(tail, name, true, value);
   }
 
-  private static final class RangeConstraint extends ConsConstraint {
-    RangeConstraint(Constraint tail, String name, boolean negate, Range<?> value) {
-      super(tail, name, negate, checkNotNull(value));
-    }
 
-    @Override
-    <V extends ConstraintVisitor<V>> V dispatch(V visitor) {
-      return visitor.range(name, negate, (Range<?>) value);
-    }
+  public static Constraint in(Constraint tail, String name, Iterable<?> values) {
+    return new InConstraint(tail, name,false, values);
   }
 
-  private static final class SizeConstraint extends ConsConstraint {
-    SizeConstraint(Constraint tail, String name, boolean negate, int value) {
-      super(tail, name, negate, value);
-    }
-
-    @Override
-    <V extends ConstraintVisitor<V>> V dispatch(V visitor) {
-      return visitor.size(name, negate, (Integer) value);
-    }
+  public static Constraint notIn(Constraint tail, String name, Iterable<?> values) {
+    return new InConstraint(tail, name, true, values);
   }
 
-  private static final class PresenseConstraint extends ConsConstraint {
-    PresenseConstraint(Constraint tail, String name, boolean negate) {
-      super(tail, name, negate, null);
-    }
-
-    @Override
-    <V extends ConstraintVisitor<V>> V dispatch(V visitor) {
-      return visitor.present(name, negate);
-    }
-  }
-
-  private static final class NestedConstraint extends ConsConstraint {
-    NestedConstraint(Constraint tail, String name, ConstraintHost value) {
-      super(tail, name, false, value);
-    }
-
-    @Override
-    <V extends ConstraintVisitor<V>> V dispatch(V visitor) {
-      return visitor.nested(name, (ConstraintHost) value);
-    }
-  }
 
   private static final class DisjunctionConstraint extends Constraint {
     private final Constraint tail;
@@ -130,20 +70,20 @@ public final class Constraints {
     }
 
     @Override
-    public <V extends ConstraintVisitor<V>> V accept(V visitor) {
-      return tail.accept(visitor).disjunction();
+    public <R> R accept(Visitor<R> visitor) {
+      throw new UnsupportedOperationException();
     }
   }
 
   private static final Constraint NIL = new Constraint() {
     @Override
-    public final <V extends ConstraintVisitor<V>> V accept(V visitor) {
-      return visitor;
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.disjunction();
     }
 
     @Override
-    public boolean isNil() {
-      return true;
+    public Constraint visit(String name, Operation<?> operation) {
+      return this;
     }
   };
 
@@ -151,77 +91,30 @@ public final class Constraints {
     return NIL;
   }
 
-  public abstract static class Constraint implements ConstraintVisitor<Constraint>, ConstraintHost {
 
-    public boolean isNil() {
-      return false;
-    }
-
-    @Override
-    public Constraint in(String name, boolean negate, Iterable<?> values) {
-      return new InConstraint(this, name, negate, values);
-    }
-
-    @Override
-    public Constraint equal(String name, boolean negate, @Nullable Object value) {
-      return new EqualToConstraint(this, name, negate, value);
-    }
-
-    @Override
-    public Constraint range(String name, boolean negate, Range<?> range) {
-      return new RangeConstraint(this, name, negate, range);
-    }
-
-    @Override
-    public Constraint size(String name, boolean negate, int size) {
-      return new SizeConstraint(this, name, negate, size);
-    }
-
-    @Override
-    public Constraint present(String name, boolean negate) {
-      return new PresenseConstraint(this, name, negate);
-    }
-
-    @Override
-    public Constraint match(String name, boolean negate, Pattern pattern) {
-      throw new UnsupportedOperationException();
-    }
+  public abstract static class Constraint implements Visitor<Constraint>, Visitable {
 
     @Override
     public Constraint disjunction() {
       return new DisjunctionConstraint(this);
     }
 
-    @Override
-    public Constraint nested(String name, ConstraintHost constraints) {
-      return new NestedConstraint(this, name, constraints);
-    }
   }
 
-  private abstract static class ConsConstraint extends Constraint {
+  private abstract static class ConsConstraint extends Constraint  {
     final Constraint tail;
     final String name;
-    final boolean negate;
-    @Nullable
-    final Object value;
+    final Operation<?> operation;
 
     ConsConstraint(
             Constraint tail,
             String name,
-            boolean negate,
-            @Nullable Object value) {
-      this.tail = checkNotNull(tail);
-      this.name = checkNotNull(name);
-      this.value = value;
-      this.negate = negate;
+            Operation<?> operation) {
+      this.tail = checkNotNull(tail, "tail");
+      this.name = checkNotNull(name, "name");
+      this.operation = checkNotNull(operation, "operation");
     }
 
-    @Override
-    public final <V extends ConstraintVisitor<V>> V accept(V visitor) {
-      return dispatch(tail.accept(visitor));
-    }
-
-    abstract <V extends ConstraintVisitor<V>> V dispatch(V visitor);
   }
 
 }

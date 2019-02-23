@@ -50,7 +50,7 @@ public class ReflectionEvaluator<C extends DocumentCriteria<C, T>, T> implements
   @Override
   public boolean apply(T input) {
     Preconditions.checkNotNull(input, "input");
-    final Constraints.ConstraintHost host = (Constraints.ConstraintHost) criteria;
+    final Constraints.Visitable host = (Constraints.Visitable) criteria;
     final LocalVisitor<T> visitor = new LocalVisitor<>(new FieldExtractor<T>(input));
     host.accept(visitor);
     return visitor.result();
@@ -86,7 +86,7 @@ public class ReflectionEvaluator<C extends DocumentCriteria<C, T>, T> implements
     }
   }
 
-  private static class LocalVisitor<T> implements Constraints.ConstraintVisitor<LocalVisitor<T>> {
+  private static class LocalVisitor<T> implements Constraints.Visitor<LocalVisitor<T>> {
 
     private final ValueExtractor<T> extractor;
     private boolean previous;
@@ -106,11 +106,7 @@ public class ReflectionEvaluator<C extends DocumentCriteria<C, T>, T> implements
       return previous || current;
     }
 
-    @Override
-    public LocalVisitor<T> in(String name, boolean negate, Iterable<?> values) {
-      if (skipEvaluation()) {
-        return this;
-      }
+    private LocalVisitor<T> in(String name, boolean negate, Iterable<?> values) {
 
       final Object extracted = extractor.extract(name);
 
@@ -125,8 +121,7 @@ public class ReflectionEvaluator<C extends DocumentCriteria<C, T>, T> implements
       return this;
     }
 
-    @Override
-    public LocalVisitor<T> equal(String name, boolean negate, @Nullable Object value) {
+    private LocalVisitor<T> equal(String name, boolean negate, @Nullable Object value) {
       if (skipEvaluation()) {
         return this;
       }
@@ -157,11 +152,6 @@ public class ReflectionEvaluator<C extends DocumentCriteria<C, T>, T> implements
     }
 
     @Override
-    public LocalVisitor<T> size(String name, boolean negate, int size) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
     public LocalVisitor<T> present(String name, boolean negate) {
       if (skipEvaluation()) {
         return this;
@@ -180,13 +170,16 @@ public class ReflectionEvaluator<C extends DocumentCriteria<C, T>, T> implements
     }
 
     @Override
-    public LocalVisitor<T> match(String name, boolean negate, Pattern pattern) {
-      throw new UnsupportedOperationException();
-    }
+    public LocalVisitor<T> visit(String name, Operation<?> operation) {
+      if (skipEvaluation()) {
+        return this;
+      }
 
-    @Override
-    public LocalVisitor<T> nested(String name, Constraints.ConstraintHost constraints) {
-      throw new UnsupportedOperationException();
+      if (operation.getOperator() == Operators.EQ) {
+
+      }
+
+      return null;
     }
 
     @Override

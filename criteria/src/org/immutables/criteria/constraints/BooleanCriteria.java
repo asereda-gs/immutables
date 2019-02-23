@@ -28,7 +28,7 @@ public class BooleanCriteria<C extends DocumentCriteria<C, T>, T> extends Object
   }
 
   public C isTrue() {
-    return creator.create(constraint.equal(name, false, Boolean.TRUE));
+    return creator.create(Constraints.isEqualTo(constraint, name, Boolean.TRUE));
   }
 
   public C isFalse() {

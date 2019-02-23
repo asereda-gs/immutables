@@ -61,7 +61,7 @@ import [starImport];
 @javax.annotation.concurrent.Immutable
 [atGenerated type]
 [type.typeDocument.access]final class [type.name]Criteria implements DocumentCriteria<[type.name]Criteria, [type.typeDocument]>,
-                                        Disjunction<[type.name]Criteria, [type.name]>, Constraints.ConstraintHost {
+                                        Disjunction<[type.name]Criteria, [type.name]>, Constraints.Visitable {
 
    private final Constraints.Constraint constraint;
 
@@ -85,10 +85,10 @@ import [starImport];
         return new [type.name]Criteria(Constraints.nilConstraint());
    }
 
-   @Override
-   public <V extends Constraints.ConstraintVisitor<V>> V accept(V visitor) {
-       return constraint.accept(visitor);
-   }
+  @Override
+  public <R> R accept(Constraints.Visitor<R> visitor) {
+    return constraint.accept(visitor);
+  }
 
    @Override
    public [type.name]Criteria or() {
