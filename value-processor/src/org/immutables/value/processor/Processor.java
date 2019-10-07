@@ -15,12 +15,15 @@
  */
 package org.immutables.value.processor;
 
+import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
@@ -28,11 +31,15 @@ import javax.lang.model.element.Element;
 import javax.tools.FileObject;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileManager.Location;
+
+import com.google.common.collect.Multimaps;
 import org.immutables.generator.AbstractGenerator;
 import org.immutables.generator.ForwardingFiler;
 import org.immutables.generator.ForwardingProcessingEnvironment;
 import org.immutables.value.processor.encode.EncodingMirror;
 import org.immutables.value.processor.encode.Generator_Encodings;
+import org.immutables.value.processor.meta.CriteriaMirror;
+import org.immutables.value.processor.meta.CriteriaRepositoryMirror;
 import org.immutables.value.processor.meta.CustomImmutableAnnotations;
 import org.immutables.value.processor.meta.EnclosingMirror;
 import org.immutables.value.processor.meta.FConstructorMirror;
@@ -58,6 +65,8 @@ import org.immutables.value.processor.meta.ValueUmbrellaMirror;
     FConstructorMirror.QUALIFIED_NAME,
     FIncludeMirror.QUALIFIED_NAME,
     EncodingMirror.QUALIFIED_NAME,
+    CriteriaMirror.QUALIFIED_NAME,
+    CriteriaRepositoryMirror.QUALIFIED_NAME
 })
 public final class Processor extends AbstractGenerator {
   @Override
@@ -71,7 +80,14 @@ public final class Processor extends AbstractGenerator {
         .round(round())
         .build();
 
-    Multimap<DeclaringPackage, ValueType> values = round.collectValues();
+    Multimap<DeclaringPackage, ValueType> allValues = round.collectValues();
+
+    Multimap<DeclaringPackage, ValueType> values = Multimaps.filterValues(allValues, new Predicate<ValueType>() {
+      @Override
+      public boolean apply(ValueType input) {
+        return !input.constitution.protoclass().kind().isPojo();
+      }
+    });
 
     invoke(new Generator_Immutables().usingValues(values).generate());
     invoke(new Generator_Modifiables().usingValues(values).generate());
@@ -80,8 +96,8 @@ public final class Processor extends AbstractGenerator {
       invoke(new Generator_Gsons().usingValues(values).generate());
     }
     if (round.environment().hasCriteriaModule()) {
-      invoke(new Generator_Criteria().usingValues(values).generate());
-      invoke(new Generator_CriteriaRepository().usingValues(values).generate());
+      invoke(new Generator_Criteria().usingValues(allValues).generate());
+      invoke(new Generator_CriteriaRepository().usingValues(allValues).generate());
     }
     if (round.environment().hasMongoModule()) {
       invoke(new Generator_Repositories().usingValues(values).generate());

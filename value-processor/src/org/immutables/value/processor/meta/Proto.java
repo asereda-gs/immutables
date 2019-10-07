@@ -1044,6 +1044,21 @@ public class Proto {
       return element().getNestingKind() == NestingKind.TOP_LEVEL;
     }
 
+    /**
+     * Checks if this element is a regular POJO (not an interface or abstract class) simple
+     * class with getters and setters
+     */
+    @Value.Derived
+    @Value.Auxiliary
+    public boolean isPojo() {
+      return element().getKind().isClass() &&
+             element().getKind() != ElementKind.ENUM &&
+             !element().getModifiers().contains(Modifier.PRIVATE) &&
+             !element().getModifiers().contains(Modifier.ABSTRACT) &&
+              // restrict to Criteria and Repository annotations for now
+              (CriteriaMirror.find(element()).isPresent() || CriteriaRepositoryMirror.find(element()).isPresent());
+    }
+
     public boolean isImmutable() {
       return features().isPresent();
     }
@@ -1577,6 +1592,7 @@ public class Proto {
       DEFINED_FACTORY,
       DEFINED_CONSTRUCTOR,
       DEFINED_TYPE,
+      DEFINED_POJO,
       DEFINED_TYPE_AND_COMPANION,
       DEFINED_COMPANION,
       DEFINED_AND_ENCLOSING_TYPE,
@@ -1614,12 +1630,17 @@ public class Proto {
         }
       }
 
+      public boolean isPojo() {
+        return this == DEFINED_POJO;
+      }
+
       public boolean isValue() {
         switch (this) {
         case INCLUDED_IN_PACKAGE:
         case INCLUDED_ON_TYPE:
         case INCLUDED_IN_TYPE:
         case DEFINED_TYPE:
+        case DEFINED_POJO:
         case DEFINED_TYPE_AND_COMPANION:
         case DEFINED_AND_ENCLOSING_TYPE:
         case DEFINED_NESTED_TYPE:
@@ -1632,6 +1653,7 @@ public class Proto {
       public boolean isDefinedValue() {
         switch (this) {
         case DEFINED_TYPE:
+        case DEFINED_POJO:
         case DEFINED_TYPE_AND_COMPANION:
         case DEFINED_AND_ENCLOSING_TYPE:
         case DEFINED_NESTED_TYPE:
